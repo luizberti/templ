@@ -1,6 +1,9 @@
 #!/bin/bash -e
 usage() {
-    test -z "$1" && echo usage: $0 KEY=Value TARGET [TARGET ...] && exit 1
+    test -n "$1" && (
+        echo "$@"
+        echo usage: $0 KEY=Value TARGET [TARGET ...]
+    ) >&2 && exit 1
 
     local norm=$(tput sgr0)
     local bold=$(tput bold)
@@ -39,12 +42,12 @@ ${bold}SYNOPSIS${norm}
 ${bold}DESCRIPTION${norm}
     This tool was written to aid the deployment of template assets in
     environments where you wouldn't want to install dependencies. The only
-    dependency this requires is having any working version of Python in
-    your ${bold}\$PATH${norm}.
+    requirement this has is Bash 4.4 or higher.
 
     It's a very simple tool, which makes it very handy, but also means it
     has several limitations. If it doesn't suit your use case in particular
-    you might have to search for more robust alternatives.
+    you might have to search for more robust alternatives. If you need
+    POSIX compliance, take a look at M4(1).
 
 ${bold}AUTHORS${norm}
     Created by ${bold}Luiz Berti${norm}           ${bold}https://berti.me
@@ -66,53 +69,43 @@ ${bold}LICENSING${norm}
     ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 EOF
-    exit $1
-}
-
-# EARLY EXIT CONDITIONS
-#######################
-
-test -z "$REPS" && REPS=2                            # SETS DEFAULT REPS
-test "$REPS" -ge 0 2> /dev/null || usage             # PRINTS QUICK GUIDE IF INVALID REPS
-test -z "$1" && usage                                # PRINTS QUICK GUIDE IF NO ARGS
-test "$1" = '--help' || test "$1" = '-h' && usage 0  # PRINTS MAN PAGE
-
-
-# CORE FUNCTIONS
-################
-
-replace() {
-    KEY="$1" VALUE="$2" python -c "$(cat <<EOF
-from os import environ as env
-from sys import stdin, stdout
-stdout.write(stdin.read().replace(('{'*$REPS)+env['KEY']+('}'*$REPS), env['VALUE']))
-EOF
-)"
-}
-
-fill() {
-    test -z "$1" && cat - && return
-    local sub="$1" && shift
-    replace "$(cut -d = -f1 <<< "$sub")" "$(cut -d = -f2- <<< "$sub")" | fill "$@"
+    exit
 }
 
 
 # ARGUMENT PARSING
 ##################
 
+[[ "$1" =~ ^(-h|--help)$ ]] && usage  # PRINTS MAN PAGE
+SEQN="$(seq 1 ${REPS:-2})"  || usage  'invalid REPS'
+
 TARGETS="$(for arg in "$@"; do
     test "${arg#*=}" != "$arg" && continue
     test "$arg" != - && find "$arg" -name '*.in' -type f || echo -
-done)"
+done)" && test -n "$TARGETS" || usage 'no targets were given!'
 for arg in "$@"; do shift; test "${arg#*=}" != "$arg" && set -- "$@" "$arg"; done  # PRUNE ARGV
-test "$DRYRUN" = 1 && tr -s / / <<< "$TARGETS" | xargs -n1 echo 1>&2 && exit       # DRYRUN
+
+test "$DRYRUN" = 1 && tr -s / / <<< "$TARGETS" | xargs -n1 echo >&2 && exit        # DRYRUN
 
 
-# MAIN
-######
+# CORE SECTION
+##############
+
+fill() {
+    local str="$(cat)"
+
+    for arg in "$@"; do
+        local sub="${LHS:=$(printf '{%.0s' $SEQN)}${arg%%=*}${RHS:=$(printf '}%.0s' $SEQN)}"
+        local val="${arg#*=}"
+
+        str="${str//"$sub"/$val}"
+    done
+
+    cat <<< "$str"
+}
 
 for target in $TARGETS; do
-    test "$VERBOSE" = 1 && test $target != - && echo $target | tr -s / / 1>&2
+    test "$VERBOSE" = 1 && test $target != - && echo $target | tr -s / / >&2
 
     test "$target" = - && fill "$@" && continue
 
