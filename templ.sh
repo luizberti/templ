@@ -66,11 +66,17 @@ EOF
     exit $1
 }
 
-test -z "$REPS" && REPS=2
-test "$REPS" -ge 0 2> /dev/null || usage 1
-test -z "$1" && echo usage: $0 KEY=Value filename ...
-test "$1" = '--help' || test "$1" = '-h' && usage 0
+# EARLY EXIT CONDITIONS
+#######################
 
+test -z "$REPS" && REPS=2                                        # SETS DEFAULT REPS
+test "$REPS" -ge 0 2> /dev/null || usage 1                       # PRINTS USAGE IF INVALID REPS
+test -z "$1" && echo usage: $0 KEY=Value filename ... && exit 1  # PRINTS QUICK GUIDE IF NO ARGS
+test "$1" = '--help' || test "$1" = '-h' && usage                # PRINTS HELP IF REQUESTED
+
+
+# CORE FUNCTIONS
+################
 
 replace() {
     KEY="$1" VALUE="$2" python -c "$(cat <<EOF
@@ -88,16 +94,27 @@ fill() {
 }
 
 
-TARGETS="$(for arg in "$@"; do test "${arg#*=}" = "$arg" && find "$arg" -type f; done)"
-for arg in "$@"; do shift; test "${arg#*=}" != "$arg" && set -- "$@" "$arg"; done
+# ARGUMENT PARSING
+##################
+
+TARGETS="$(for arg in "$@"; do
+    test "${arg#*=}" != "$arg" && continue
+    test "$arg" != - && find "$arg" -name '*.in' -type f || echo -
+done)"
+for arg in "$@"; do shift; test "${arg#*=}" != "$arg" && set -- "$@" "$arg"; done  # PRUNE ARGV
+test "$DRYRUN" = 1 && tr -s / / <<< "$TARGETS" | xargs -n1 echo 1>&2 && exit       # DRYRUN
+
+
+# MAIN
+######
 
 for target in $TARGETS; do
-    test "$VERBOSE" = 1 && echo $target 1>&2 && test "$DRYRUN" = 1 && continue
-    
-    test "$target" = '-' && fill "$@" && continue
+    test "$VERBOSE" = 1 && test $target != - && echo $target | tr -s / / 1>&2
+    test "$target" = - && fill "$@" && continue
 
-    tmp=$(mktemp)
-    cat $target | fill "$@" > $tmp
-    test "$BACKUP" = 1 && mv $target $target.bak
-    mv $tmp $target
+    cat $target | fill "$@" > ${target%.in}
+    chown --reference=$target ${target%.in}
+    chmod --reference=$target ${target%.in}
+    test "$DESTROYSRC" = 1 && rm $target
 done
+
