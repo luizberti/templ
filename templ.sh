@@ -1,5 +1,7 @@
 #!/bin/bash -e
 usage() {
+    test -z "$1" && echo usage: $0 KEY=Value TARGET [TARGET ...] && exit 1
+
     local norm=$(tput sgr0)
     local bold=$(tput bold)
     local term=$(tput setaf 003)
@@ -11,7 +13,7 @@ ${bold}NAME${norm}
 
 ${bold}SYNOPSIS${norm}
     ${term}$ templ${norm}
-    usage: templ KEY=Value filename ...
+    usage: templ KEY=Value TARGET [TARGET ...]
 
     ${term}$ templ [-h | --help]${norm}
     <prints this help manual page>
@@ -25,14 +27,14 @@ ${bold}SYNOPSIS${norm}
     ${term}$ echo '{{KEY}}' | templ ${hint}"KEY=\$(cat big)"${term} -  ${note}# this can be complex!${norm}
     <the contents of 'big'>
 
-    ${term}$ ${hint}VERBOSE=1${term} templ KEY=Value ${hint}template.yaml${norm}
-    template.yaml
+    ${term}$ templ KEY=Value template.yaml.in ${hint}&& ls  ${note}# it only operates on *.in files${norm}
+    template.yaml.in    ${hint}template.yaml
 
-    ${term}$ ${hint}DRYRUN=1${term} templ KEY=Value template.yaml  ${note}# this only prints the targets${norm}
-    template.yaml
+    ${term}$ ${hint}VERBOSE=1${term} templ KEY=Value template.yaml.in  ${note}# you can also use DRYRUN=1
+    ${hint}template.yaml.in                              ${note}# to simulate execution
 
-    ${term}$ ${hint}BACKUP=1${term} templ KEY=Value template.yaml ${hint}&& ls  ${note}# *.bak is intact!
-    template.yaml   template.yaml.bak
+    ${term}$ ${hint}DESTROYSRC=1${term} templ KEY=Value template.yaml.in ${hint}&& ls  ${note}# removes templates
+    ${hint}template.yaml                                          ${note}# after conversion!
 
 ${bold}DESCRIPTION${norm}
     This tool was written to aid the deployment of template assets in
@@ -45,8 +47,9 @@ ${bold}DESCRIPTION${norm}
     you might have to search for more robust alternatives.
 
 ${bold}AUTHORS${norm}
-    Created by ${bold}Luiz Berti${norm}, and primarily hosted on GitHub at
-    ${bold}https://gist.github.com/luizberti/efc3a84e908deedb05307eed1d9b444d
+    Created by ${bold}Luiz Berti${norm}           ${bold}https://berti.me
+                                    ${bold}https://github.com/luizberti
+    Hosted on ${bold}GitHub${norm}                ${bold}https://github.com/luizberti/templ
 
 ${bold}LICENSING${norm}
     Copyright (c) 2018 Luiz Berti <luizberti@users.noreply.github.com>
@@ -69,10 +72,10 @@ EOF
 # EARLY EXIT CONDITIONS
 #######################
 
-test -z "$REPS" && REPS=2                                        # SETS DEFAULT REPS
-test "$REPS" -ge 0 2> /dev/null || usage 1                       # PRINTS USAGE IF INVALID REPS
-test -z "$1" && echo usage: $0 KEY=Value filename ... && exit 1  # PRINTS QUICK GUIDE IF NO ARGS
-test "$1" = '--help' || test "$1" = '-h' && usage                # PRINTS HELP IF REQUESTED
+test -z "$REPS" && REPS=2                            # SETS DEFAULT REPS
+test "$REPS" -ge 0 2> /dev/null || usage             # PRINTS QUICK GUIDE IF INVALID REPS
+test -z "$1" && usage                                # PRINTS QUICK GUIDE IF NO ARGS
+test "$1" = '--help' || test "$1" = '-h' && usage 0  # PRINTS MAN PAGE
 
 
 # CORE FUNCTIONS
