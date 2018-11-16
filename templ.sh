@@ -110,11 +110,13 @@ test "$DRYRUN" = 1 && tr -s / / <<< "$TARGETS" | xargs -n1 echo 1>&2 && exit    
 
 for target in $TARGETS; do
     test "$VERBOSE" = 1 && test $target != - && echo $target | tr -s / / 1>&2
+
     test "$target" = - && fill "$@" && continue
 
     cat $target | fill "$@" > ${target%.in}
-    chown --reference=$target ${target%.in}
-    chmod --reference=$target ${target%.in}
+    chown $(stat -f '%u:%g' $target) ${target%.in}  # PRESERVE OWNERSHIP
+    chmod $(stat -f '%p'    $target) ${target%.in}  # PRESERVE PERMISSIONS
+
     test "$DESTROYSRC" = 1 && rm $target
 done
 
