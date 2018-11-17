@@ -74,5 +74,5 @@ else
     usage 'not a valid mapping'
 fi
 
-./templ.sh "${map[@]}" "$@"
+hash ./templ.sh 2> /dev/null && ./templ.sh "${map[@]}" "$@" || templ "${map[@]}" "$@"
 
