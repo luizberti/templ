@@ -107,12 +107,14 @@ fill() {
 for target in $TARGETS; do
     test "$VERBOSE" = 1 && test $target != - && echo $target | tr -s / / >&2
 
-    test "$target" = - && fill "$@" && continue
+    if [ "$target" = - ]; then
+        fill "$@"
+    else
+        cat $target | fill "$@" > ${target%.in}
+        chown $(stat -f '%u:%g' $target) ${target%.in}  # PRESERVE OWNERSHIP
+        chmod $(stat -f '%p'    $target) ${target%.in}  # PRESERVE PERMISSIONS
 
-    cat $target | fill "$@" > ${target%.in}
-    chown $(stat -f '%u:%g' $target) ${target%.in}  # PRESERVE OWNERSHIP
-    chmod $(stat -f '%p'    $target) ${target%.in}  # PRESERVE PERMISSIONS
-
-    test "$DESTROYSRC" = 1 && rm $target
+        test "$DESTROYSRC" = 1 && rm $target
+    fi
 done
 
