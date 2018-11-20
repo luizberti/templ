@@ -111,8 +111,10 @@ for target in $TARGETS; do
         fill "$@"
     else
         cat $target | fill "$@" > ${target%.in}
-        chown $(stat -f '%u:%g' $target) ${target%.in}  # PRESERVE OWNERSHIP
-        chmod $(stat -f '%p'    $target) ${target%.in}  # PRESERVE PERMISSIONS
+
+        # PRESERVE OWNERSHIP AND PERMISSIONS
+        chown $(stat -c %u:%g $target 2>/dev/null || stat -f %u:%g $target 2>/dev/null) ${target%.in}
+        chmod $(stat -c %a    $target 2>/dev/null || stat -f %p    $target 2>/dev/null) ${target%.in}
 
         test "$DESTROYSRC" = 1 && rm $target
     fi
