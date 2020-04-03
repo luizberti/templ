@@ -11,42 +11,41 @@ bloggers. It's up to your imagination.
 
 
 ## Examples
-**Fill configuration files from environment variables**
+**Substituting from STDIN**
 ```bash
+$ echo 'Hi, my name is {{FIRST}} {{LAST}}' | templ FIRST=John LAST=Doe -
+Hi, my name is John Doe
+```
+
+**Substitute big files, no need to worry about escaping them for `templ`**
+```bash
+$ echo 'big.txt: {{CONTENTS}}' | templ CONTENTS="$(curl https://norvig.com/big.txt)" -
+big.txt: The Project Gutenberg EBook of The Adventures of Sherlock Holmes
+by Sir Arthur Conan Doyle
+...
+```
+
+**Using template files**
+```bash
+# NOTE Templates should end with `.in`
 $ ls /etc/spark-conf
 core-site.xml.in    yarn-site.xml.in    spark-defaults.conf.in
+
+# NOTE This is injecting `SPARK` and `HADOOP` related env vars into the template
 $ DESTROYSRC=1 templ $(SPARK=foo env | grep -E 'SPARK|HADOOP') /etc/spark-conf
+
+# NOTE The DELETESRC variable removed the original templates after substitution
+$ ls /etc/spark-conf
+core-site.xml       yarn-site.xml       spark-defaults.conf
 ```
 
-**Automate Emails!**
+**Configurable delimiters and delimiter sequence lengths**
 ```bash
-$ cat sorry.txt.in
-Subject: Can't go...
-I'm so sorry I can't make it to your party {{NAME}}! I told {{LIE}} I'd go to his...
+# NOTE The SEQN env variable configures how many delimiters to use for the substitution
+$echo '{{{{FIRST}}}} {{LAST}}' | SEQN=4 templ FIRST=John LAST=Doe -
+Hi, my name is John {{LAST}}
 
-$ cat contacts.tsv
-Joe     joe@a.com
-Jon     jon@b.com
-Vic     vic@c.com
-
-$ LIES="$(join -j 42 -o {1,2}.1 contacts.tsv{,} | awk '$1 != $2 {print $1, $2}')"
-
-$ LIES="$(sort -u -k1,1 <<< "$LIES" | join -j 1 - contacts.tsv)"
-
-$ echo "$LIES"
-Joe Jon joe@a.com
-Jon Joe jon@b.com
-Vic Joe vic@c.com
-
-$ xargs -n 3 sh -c 'cat sorry.txt | templ NAME=$0 LIE=$1 - | sendmail $2' <<< "$LIES"
-Subject: Can't go...
-I'm so sorry I can't make it to your party Joe! I told Jon I'd go to his...
-SENT
-Subject: Can't go...
-I'm so sorry I can't make it to your party Jon! I told Joe I'd go to his...
-SENT
-Subject: Can't go...
-I'm so sorry I can't make it to your party Vic! I told Joe I'd go to his...
-SENT
+# NOTE The LHS and RHS env vars respectively set the left and right delimiter characters
+$ echo '%%FOO%%' | LHS='%' RHS='%' templ FOO=bar -
+bar
 ```
-
